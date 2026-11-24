@@ -1,0 +1,2244 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Penilaian Siswa SMP (Kelas 7.1, 7.3 - 7.7)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- SheetJS (XLSX) untuk Export Spreadsheet Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Chart.js untuk Analitik Nilai -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Hilangkan panah spinner bawaan input number agar tampilan tabel bersih */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        /* Custom scrollbar untuk tabel nilai horizontal */
+        .table-scroll::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .table-scroll::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        .table-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+        .table-scroll::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- =====================================================================
+         HEADER UTAMA & NAVIGASI AKSI
+    ====================================================================== -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+            <!-- Brand & Judul -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                    <i class="fa-solid fa-graduation-cap text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-base sm:text-lg font-extrabold text-slate-900 leading-tight">Buku Nilai Digital SMP</h1>
+                    <p class="text-[11px] sm:text-xs text-slate-500">Kelas 7.1, 7.3, 7.4, 7.5, 7.6 & 7.7 • Sinkron Lintas Perangkat</p>
+                </div>
+            </div>
+
+            <!-- Tombol Kontrol Utama -->
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Indikator Sinkronisasi Cloud -->
+                <div id="sync-status" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200" title="Status penyimpanan lokal & cloud">
+                    <span id="sync-dot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span id="sync-text" class="hidden md:inline">Memuat...</span>
+                    <span id="schema-badge" class="hidden sm:inline-block ml-1 px-1.5 py-0.5 rounded-md bg-white/80 text-[10px] font-mono font-bold text-slate-600 border border-slate-200/80" title="Versi Skema Frontend-Backend">v2.0</span>
+                </div>
+
+                <!-- Tombol Kode Ruang / Sinkronisasi -->
+                <button onclick="openWorkspaceModal()" class="p-2 sm:px-3 sm:py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs sm:text-sm font-semibold transition flex items-center gap-1.5" title="Kelola Kode Ruang Kelas & Sinkronisasi Lintas Perangkat">
+                    <i class="fa-solid fa-key"></i>
+                    <span class="hidden lg:inline">Ruang:</span>
+                    <span id="header-workspace-code" class="font-mono font-bold">SMP7-UTAMA</span>
+                </button>
+
+                <!-- Tombol Simpan & Sinkronkan Sekarang -->
+                <button onclick="forceSaveAndSync()" id="btn-force-save" class="p-2 sm:px-3 sm:py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold shadow-sm transition flex items-center gap-1.5" title="Simpan & Sinkronkan Semua Perubahan Sekarang">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <span class="hidden sm:inline">Simpan</span>
+                </button>
+
+                <!-- Tombol Pengaturan Bobot & Identitas -->
+                <button onclick="openSettingsModal()" class="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-medium transition flex items-center gap-2" title="Pengaturan Bobot, KKTP & Identitas Guru">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span class="hidden md:inline">Pengaturan</span>
+                </button>
+
+                <!-- Dropdown Export Spreadsheet -->
+                <div class="relative">
+                    <button onclick="toggleExportMenu()" class="p-2 sm:px-3.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold shadow-sm transition flex items-center gap-2">
+                        <i class="fa-solid fa-file-excel"></i>
+                        <span>Export Excel</span>
+                        <i class="fa-solid fa-chevron-down text-[10px]"></i>
+                    </button>
+                    <div id="export-menu" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-40">
+                        <div class="px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">Unduh Spreadsheet (.XLSX)</div>
+                        <button onclick="exportCurrentClassExcel()" class="w-full text-left px-4 py-2.5 text-xs sm:text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 flex items-center gap-2.5 transition">
+                            <i class="fa-solid fa-table text-emerald-600 w-4"></i>
+                            <div>
+                                <div class="font-semibold">Kelas Aktif (<span class="active-class-label">7.1</span>)</div>
+                                <div class="text-[11px] text-slate-500">Format resmi daftar nilai guru</div>
+                            </div>
+                        </button>
+                        <button onclick="exportAllClassesExcel()" class="w-full text-left px-4 py-2.5 text-xs sm:text-sm text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 flex items-center gap-2.5 transition border-t border-slate-100">
+                            <i class="fa-solid fa-layer-group text-blue-600 w-4"></i>
+                            <div>
+                                <div class="font-semibold">Semua Kelas (7.1 – 7.7)</div>
+                                <div class="text-[11px] text-slate-500">Multi-sheet + Rekap Ketuntasan</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- =====================================================================
+         KONTEN UTAMA
+    ====================================================================== -->
+    <main class="max-w-7xl w-full mx-auto px-3 sm:px-6 py-5 flex-1 space-y-5">
+
+        <!-- Banner Info Mata Pelajaran, Semester & Bobot -->
+        <section class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3 sm:gap-5">
+                <div>
+                    <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Mata Pelajaran</div>
+                    <div id="disp-mapel" class="text-sm sm:text-base font-bold text-slate-900">Ilmu Pengetahuan Alam (IPA)</div>
+                </div>
+                <div class="h-8 w-px bg-slate-200 hidden sm:block"></div>
+                <div>
+                    <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Semester / TP</div>
+                    <div id="disp-semester" class="text-sm font-semibold text-slate-800">Ganjil • 2026/2027</div>
+                </div>
+                <div class="h-8 w-px bg-slate-200 hidden sm:block"></div>
+                <div>
+                    <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">KKTP / KKM</div>
+                    <div class="inline-flex items-center px-2.5 py-0.5 rounded-lg bg-blue-50 text-blue-700 font-bold text-sm" id="disp-kktp">75</div>
+                </div>
+                <div class="h-8 w-px bg-slate-200 hidden sm:block"></div>
+                <div>
+                    <div class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Bobot Rapor</div>
+                    <span id="disp-bobot" class="text-xs font-medium text-slate-600">NH 30% | UH 30% | PTS 20% | PAS 20%</span>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 self-start lg:self-center">
+                <span id="last-saved-label" class="text-[11px] text-slate-500 bg-slate-100 px-2.5 py-1.5 rounded-xl">
+                    <i class="fa-regular fa-clock mr-1"></i> Terakhir disimpan: -
+                </span>
+                <button onclick="openSettingsModal()" class="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-xl transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-pen-to-square"></i> Ubah Info Mapel & Bobot
+                </button>
+            </div>
+        </section>
+
+        <!-- Navigasi Tab Kelas (7.1, 7.3, 7.4, 7.5, 7.6, 7.7) + Tab Analitik -->
+        <section class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div id="class-tabs" class="flex items-center gap-1.5 overflow-x-auto pb-1">
+                <!-- Diisi otomatis via JavaScript -->
+            </div>
+
+            <div class="flex items-center gap-1.5 bg-slate-200/70 p-1 rounded-xl self-start sm:self-auto">
+                <button id="view-btn-input" onclick="switchView('input')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-xs transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-table-cells"></i> Input Nilai
+                </button>
+                <button id="view-btn-analytics" onclick="switchView('analytics')" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-chart-column"></i> Analitik & Rekap
+                </button>
+            </div>
+        </section>
+
+        <!-- Kartu Ringkasan Statistik Kelas -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-medium text-slate-500">Jumlah Siswa (<span class="active-class-label">7.1</span>)</span>
+                    <span class="w-8 h-8 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center"><i class="fa-solid fa-users text-xs"></i></span>
+                </div>
+                <div id="stat-total" class="text-2xl font-extrabold text-slate-900 mt-2">0</div>
+                <div id="stat-gender" class="text-[11px] text-slate-400 mt-0.5">0 Laki-laki • 0 Perempuan</div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-medium text-slate-500">Rata-Rata Kelas</span>
+                    <span class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><i class="fa-solid fa-calculator text-xs"></i></span>
+                </div>
+                <div id="stat-avg" class="text-2xl font-extrabold text-blue-600 mt-2">0.0</div>
+                <div id="stat-minmax" class="text-[11px] text-slate-400 mt-0.5">Tertinggi: - • Terendah: -</div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-medium text-slate-500">Tuntas (≥ KKTP)</span>
+                    <span class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><i class="fa-solid fa-circle-check text-xs"></i></span>
+                </div>
+                <div id="stat-pass" class="text-2xl font-extrabold text-emerald-600 mt-2">0</div>
+                <div id="stat-pass-pct" class="text-[11px] text-slate-400 mt-0.5">0% ketuntasan klasikal</div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-medium text-slate-500">Perlu Remedial</span>
+                    <span class="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center"><i class="fa-solid fa-triangle-exclamation text-xs"></i></span>
+                </div>
+                <div id="stat-remedial" class="text-2xl font-extrabold text-rose-600 mt-2">0</div>
+                <div class="text-[11px] text-slate-400 mt-0.5">Nilai akhir di bawah KKTP</div>
+            </div>
+        </section>
+
+        <!-- =====================================================================
+             VIEW 1: TABEL INPUT & EDIT NILAI SISWA
+        ====================================================================== -->
+        <section id="view-input" class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <!-- Toolbar Tabel -->
+            <div class="p-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-2 flex-1">
+                    <div class="relative flex-1 min-w-[200px] max-w-xs">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="search-student" oninput="renderTable()" placeholder="Cari nama atau NIS siswa..." class="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <select id="filter-status" onchange="renderTable()" class="px-3 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="all">Semua Status</option>
+                        <option value="pass">Tuntas (≥ KKTP)</option>
+                        <option value="remedial">Remedial (&lt; KKTP)</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="openBulkImportModal()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-file-import"></i> Import Nama Massal
+                    </button>
+                    <button onclick="openStudentModal()" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-plus"></i> Tambah Siswa
+                    </button>
+                </div>
+            </div>
+
+            <!-- Keterangan Kolom -->
+            <div class="px-4 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+                <div>
+                    <span class="font-semibold text-slate-700">Petunjuk:</span> Ketik nilai (0–100) langsung pada kotak. Rata-rata, Nilai Akhir Rapor, Predikat & Status Tuntas dihitung dan disimpan otomatis.
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-xs bg-sky-100 border border-sky-300"></span> NH: Nilai Harian</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-xs bg-indigo-100 border border-indigo-300"></span> UH: Ulangan Harian</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-xs bg-amber-100 border border-amber-300"></span> PTS/PAS: Semester</span>
+                </div>
+            </div>
+
+            <!-- Tabel Nilai Responsif -->
+            <div class="overflow-x-auto table-scroll">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
+                            <th rowspan="2" class="py-2.5 px-2.5 font-bold text-center w-10 border-r border-slate-200 sticky left-0 bg-slate-100 z-20">No</th>
+                            <th rowspan="2" class="py-2.5 px-3 font-bold min-w-[180px] border-r border-slate-200 sticky left-10 bg-slate-100 z-20">Nama Lengkap & NIS</th>
+                            <th rowspan="2" class="py-2.5 px-2 font-bold text-center w-10 border-r border-slate-200">L/P</th>
+                            <th colspan="5" class="py-1.5 px-2 font-bold text-center bg-sky-50 text-sky-900 border-b border-r border-slate-200">Nilai Harian (Tugas / Formatif)</th>
+                            <th colspan="4" class="py-1.5 px-2 font-bold text-center bg-indigo-50 text-indigo-900 border-b border-r border-slate-200">Ulangan Harian (Sumatif Lingkup)</th>
+                            <th colspan="2" class="py-1.5 px-2 font-bold text-center bg-amber-50 text-amber-900 border-b border-r border-slate-200">Ulangan Semester</th>
+                            <th colspan="3" class="py-1.5 px-2 font-bold text-center bg-emerald-50 text-emerald-900 border-b border-r border-slate-200">Hasil Akhir Rapor</th>
+                            <th rowspan="2" class="py-2.5 px-2 font-bold text-center w-20">Aksi</th>
+                        </tr>
+                        <tr class="bg-slate-50 text-slate-600 border-b border-slate-200 text-[11px]">
+                            <!-- Sub-kolom NH -->
+                            <th class="py-1.5 px-1 text-center font-semibold bg-sky-50/60 w-14">NH 1</th>
+                            <th class="py-1.5 px-1 text-center font-semibold bg-sky-50/60 w-14">NH 2</th>
+                            <th class="py-1.5 px-1 text-center font-semibold bg-sky-50/60 w-14">NH 3</th>
+                            <th class="py-1.5 px-1 text-center font-semibold bg-sky-50/60 w-14">NH 4</th>
+                            <th class="py-1.5 px-1.5 text-center font-bold bg-sky-100/80 text-sky-900 border-r border-slate-200 w-14">Rata</th>
+                            <!-- Sub-kolom UH -->
+                            <th class="py-1.5 px-1 text-center font-semibold bg-indigo-50/60 w-14">UH 1</th>
+                            <th class="py-1.5 px-1 text-center font-semibold bg-indigo-50/60 w-14">UH 2</th>
+                            <th class="py-1.5 px-1 text-center font-semibold bg-indigo-50/60 w-14">UH 3</th>
+                            <th class="py-1.5 px-1.5 text-center font-bold bg-indigo-100/80 text-indigo-900 border-r border-slate-200 w-14">Rata</th>
+                            <!-- Sub-kolom Semester -->
+                            <th class="py-1.5 px-1 text-center font-semibold bg-amber-50/60 w-16">PTS</th>
+                            <th class="py-1.5 px-1 text-center font-semibold bg-amber-50/60 border-r border-slate-200 w-16">PAS</th>
+                            <!-- Sub-kolom Akhir -->
+                            <th class="py-1.5 px-1.5 text-center font-bold bg-emerald-100/80 text-emerald-900 w-14">NA</th>
+                            <th class="py-1.5 px-1.5 text-center font-bold bg-emerald-100/80 text-emerald-900 w-12">Pred</th>
+                            <th class="py-1.5 px-2 text-center font-bold bg-emerald-100/80 text-emerald-900 border-r border-slate-200 w-20">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="grades-tbody" class="divide-y divide-slate-200">
+                        <!-- Baris siswa dirender secara dinamis -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State jika kelas kosong -->
+            <div id="empty-state" class="hidden py-12 px-4 text-center">
+                <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                    <i class="fa-solid fa-user-slash text-lg"></i>
+                </div>
+                <h3 class="text-sm font-bold text-slate-800">Belum ada data siswa yang cocok</h3>
+                <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">Tambahkan siswa baru secara manual atau gunakan fitur Import Nama Massal untuk menyalin daftar siswa dari Excel/Word.</p>
+                <button onclick="openStudentModal()" class="mt-4 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition">
+                    + Tambah Siswa ke Kelas <span class="active-class-label">7.1</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- =====================================================================
+             VIEW 2: ANALITIK & PERBANDINGAN ANTAR KELAS (7.1 - 7.7)
+        ====================================================================== -->
+        <section id="view-analytics" class="hidden space-y-5">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <!-- Grafik Perbandingan Rata-rata Antar Kelas -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+                    <h3 class="text-sm font-bold text-slate-900 mb-1">Perbandingan Rata-Rata Nilai Antar Kelas</h3>
+                    <p class="text-xs text-slate-500 mb-4">Menampilkan rata-rata Nilai Akhir Rapor kelas 7.1, 7.3, 7.4, 7.5, 7.6, dan 7.7</p>
+                    <div class="h-64">
+                        <canvas id="chart-classes"></canvas>
+                    </div>
+                </div>
+
+                <!-- Grafik Distribusi Predikat Kelas Aktif -->
+                <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs">
+                    <h3 class="text-sm font-bold text-slate-900 mb-1">Distribusi Predikat Nilai Kelas <span class="active-class-label">7.1</span></h3>
+                    <p class="text-xs text-slate-500 mb-4">Sebaran capaian kompetensi siswa berdasarkan rentang predikat A, B, C, dan D</p>
+                    <div class="h-64">
+                        <canvas id="chart-predicates"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabel Rekapitulasi Seluruh Kelas -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Rekapitulasi Ketuntasan Seluruh Kelas (7.1 – 7.7)</h3>
+                        <p class="text-xs text-slate-500">Ringkasan otomatis siap cetak atau ekspor ke Excel</p>
+                    </div>
+                    <button onclick="exportAllClassesExcel()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-file-excel"></i> Unduh Rekap Excel
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-700 border-b border-slate-200">
+                                <th class="py-3 px-4 font-bold">Kelas</th>
+                                <th class="py-3 px-4 font-bold text-center">Jumlah Siswa</th>
+                                <th class="py-3 px-4 font-bold text-center">Rata-Rata NH</th>
+                                <th class="py-3 px-4 font-bold text-center">Rata-Rata UH</th>
+                                <th class="py-3 px-4 font-bold text-center">Rata-Rata PTS</th>
+                                <th class="py-3 px-4 font-bold text-center">Rata-Rata PAS</th>
+                                <th class="py-3 px-4 font-bold text-center">Rata-Rata Akhir</th>
+                                <th class="py-3 px-4 font-bold text-center">Tuntas</th>
+                                <th class="py-3 px-4 font-bold text-center">Remedial</th>
+                                <th class="py-3 px-4 font-bold text-center">% Ketuntasan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recap-tbody" class="divide-y divide-slate-200">
+                            <!-- Diisi via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- =====================================================================
+         MODAL TAMBAH / EDIT SISWA
+    ====================================================================== -->
+    <div id="student-modal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <h3 id="student-modal-title" class="text-base font-bold text-slate-900">Tambah Siswa Baru</h3>
+                <button onclick="closeStudentModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="student-form" onsubmit="saveStudentForm(event)" class="p-5 space-y-4">
+                <input type="hidden" id="edit-student-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Kelas</label>
+                    <select id="student-class" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="7.1">Kelas 7.1</option>
+                        <option value="7.3">Kelas 7.3</option>
+                        <option value="7.4">Kelas 7.4</option>
+                        <option value="7.5">Kelas 7.5</option>
+                        <option value="7.6">Kelas 7.6</option>
+                        <option value="7.7">Kelas 7.7</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">NIS / NISN</label>
+                    <input type="text" id="student-nis" required placeholder="Contoh: 262707001" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Lengkap Siswa</label>
+                    <input type="text" id="student-name" required placeholder="Masukkan nama lengkap sesuai absensi" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Jenis Kelamin</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center gap-2 p-2.5 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                            <input type="radio" name="student-gender" value="L" checked class="text-blue-600">
+                            <span class="text-sm font-medium">Laki-laki (L)</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50">
+                            <input type="radio" name="student-gender" value="P" class="text-blue-600">
+                            <span class="text-sm font-medium">Perempuan (P)</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="pt-2 flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeStudentModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs sm:text-sm font-semibold">Batal</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold shadow-xs">Simpan Siswa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         MODAL IMPORT NAMA SISWA MASSAL
+    ====================================================================== -->
+    <div id="bulk-modal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                <h3 class="text-base font-bold text-slate-900">Import Daftar Siswa Massal (Kelas <span class="active-class-label">7.1</span>)</h3>
+                <button onclick="closeBulkImportModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4">
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    Salin (Copy) kolom daftar siswa dari Excel atau Word lalu tempel (Paste) di bawah ini. Satu baris untuk satu siswa dengan format:<br>
+                    <code class="bg-slate-100 px-1.5 py-0.5 rounded-sm text-blue-700 font-semibold">NIS, Nama Lengkap, L/P</code> atau cukup <code class="bg-slate-100 px-1.5 py-0.5 rounded-sm text-blue-700 font-semibold">Nama Lengkap</code> saja.
+                </p>
+                <textarea id="bulk-textarea" rows="7" placeholder="Contoh:&#10;262707041, Ahmad Fauzi, L&#10;262707042, Bella Oktaviani, P&#10;Citra Kirana" class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                <div class="flex items-center justify-between gap-2">
+                    <label class="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                        <input type="checkbox" id="bulk-replace" class="rounded-sm text-rose-600">
+                        <span>Ganti seluruh daftar siswa kelas <span class="active-class-label font-semibold">7.1</span></span>
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="closeBulkImportModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold">Batal</button>
+                        <button type="button" onclick="processBulkImport()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs">Import Sekarang</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         MODAL PENGATURAN IDENTITAS GURU, MAPEL & BOBOT PENILAIAN
+    ====================================================================== -->
+    <div id="settings-modal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
+            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+                <h3 class="text-base font-bold text-slate-900">Pengaturan Standar Guru & Format Spreadsheet</h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form onsubmit="saveSettingsForm(event)" class="p-5 space-y-5 overflow-y-auto text-xs sm:text-sm">
+                <!-- Identitas Sekolah & Mapel -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-blue-600 mb-3">1. Kop & Identitas Administrasi Guru</h4>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Sekolah (SMP)</label>
+                            <input type="text" id="set-school" required class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Mata Pelajaran</label>
+                            <input type="text" id="set-subject" required class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Semester</label>
+                            <select id="set-semester" class="w-full px-3 py-2 border border-slate-300 rounded-xl bg-white">
+                                <option value="Ganjil">Ganjil (1)</option>
+                                <option value="Genap">Genap (2)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Tahun Pelajaran</label>
+                            <input type="text" id="set-year" required placeholder="2026/2027" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Guru Mata Pelajaran</label>
+                            <input type="text" id="set-teacher" required class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">NIP Guru</label>
+                            <input type="text" id="set-teacher-nip" placeholder="-" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Kepala Sekolah</label>
+                            <input type="text" id="set-principal" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">NIP Kepala Sekolah</label>
+                            <input type="text" id="set-principal-nip" placeholder="-" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Tempat & Tanggal Tanda Tangan Spreadsheet</label>
+                            <input type="text" id="set-city-date" placeholder="Contoh: Jakarta, 24 November 2026" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KKTP & Pembobotan -->
+                <div class="pt-3 border-t border-slate-200">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-blue-600 mb-3">2. KKTP & Pembobotan Nilai Akhir Rapor</h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">KKTP / KKM</label>
+                            <input type="number" id="set-kktp" min="50" max="100" required class="w-full px-3 py-2 border border-slate-300 rounded-xl font-bold text-blue-700">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Bobot NH (%)</label>
+                            <input type="number" id="set-w-nh" min="0" max="100" required oninput="updateWeightTotalLabel()" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Bobot UH (%)</label>
+                            <input type="number" id="set-w-uh" min="0" max="100" required oninput="updateWeightTotalLabel()" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Bobot PTS (%)</label>
+                            <input type="number" id="set-w-pts" min="0" max="100" required oninput="updateWeightTotalLabel()" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Bobot PAS (%)</label>
+                            <input type="number" id="set-w-pas" min="0" max="100" required oninput="updateWeightTotalLabel()" class="w-full px-3 py-2 border border-slate-300 rounded-xl">
+                        </div>
+                    </div>
+                    <div class="mt-2 flex items-center justify-between text-xs">
+                        <span class="text-slate-500">Total persentase bobot wajib 100%.</span>
+                        <span id="weight-total-indicator" class="font-bold text-emerald-600">Total: 100%</span>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeSettingsModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold">Batal</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs">Simpan Pengaturan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         MODAL RUANG KERJA (WORKSPACE CODE) & BACKUP/RESTORE LINTAS PERANGKAT
+    ====================================================================== -->
+    <div id="workspace-modal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
+            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-arrow-up text-indigo-600"></i>
+                    <h3 class="text-base font-bold text-slate-900">Ruang Kerja & Sinkronisasi Lintas Perangkat</h3>
+                </div>
+                <button onclick="closeWorkspaceModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-5 overflow-y-auto text-xs sm:text-sm">
+                <div class="p-3.5 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-900 space-y-1.5">
+                    <p class="font-bold"><i class="fa-solid fa-circle-info mr-1 text-indigo-600"></i> Cara Membuka & Mengedit di HP / Laptop Lain:</p>
+                    <p class="text-xs leading-relaxed">Gunakan <strong>Kode Ruang</strong> yang sama di perangkat manapun (atau akun manapun). Semua perubahan nilai harian, ulangan harian, semester, dan daftar siswa kelas 7.1–7.7 akan otomatis tersinkronisasi ke ruang tersebut.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Kode Ruang Aktif (Workspace ID)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="workspace-code-input" maxlength="32" placeholder="Contoh: SMPN1-IPA7-2026" class="flex-1 px-3.5 py-2 border border-slate-300 rounded-xl font-mono font-bold uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <button type="button" onclick="copyWorkspaceCode()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition" title="Salin Kode Ruang">
+                            <i class="fa-regular fa-copy"></i>
+                        </button>
+                        <button type="button" onclick="generateRandomWorkspaceCode()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold transition" title="Buat Kode Ruang Baru">
+                            <i class="fa-solid fa-shuffle"></i>
+                        </button>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mt-1">Hanya gunakan huruf, angka, dan tanda hubung (-). Saat diganti, aplikasi akan memuat data milik Kode Ruang tersebut.</p>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="applyWorkspaceCode()" class="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-right-to-bracket"></i> Masuk & Muat Kode Ruang
+                    </button>
+                    <button type="button" onclick="copyShareableWorkspaceLink()" class="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold shadow-sm transition flex items-center justify-center gap-2" title="Salin Tautan Langsung ke Ruang Ini">
+                        <i class="fa-solid fa-link"></i> Salin Link Perangkat Lain
+                    </button>
+                    <button type="button" onclick="forceSaveAndSync()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Paksa Simpan Sekarang
+                    </button>
+                </div>
+
+                <!-- Backup & Restore JSON Manual -->
+                <div class="pt-4 border-t border-slate-200 space-y-2.5">
+                    <div class="text-xs font-bold uppercase tracking-wider text-slate-500">Cadangan (Backup) & Pulihkan File (.JSON)</div>
+                    <p class="text-[11px] text-slate-500">Berguna untuk memindahkan data secara manual antar perangkat atau membuat arsip cadangan sebelum semester baru.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" onclick="exportBackupJSON()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-download text-blue-600"></i> Unduh Backup JSON
+                        </button>
+                        <label class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer">
+                            <i class="fa-solid fa-upload text-emerald-600"></i> Pulihkan dari File JSON
+                            <input type="file" id="restore-json-input" accept=".json,application/json" onchange="importBackupJSON(event)" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         MODAL KONFIRMASI HAPUS (PENGGANTI CONFIRM BROWSER)
+    ====================================================================== -->
+    <div id="confirm-modal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl border border-slate-200 p-5 text-center space-y-4">
+            <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+                <i class="fa-solid fa-trash-can text-lg"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-slate-900">Hapus Data Siswa?</h3>
+                <p id="confirm-message" class="text-xs text-slate-500 mt-1">Data nilai siswa ini akan dihapus permanen.</p>
+            </div>
+            <div class="flex items-center justify-center gap-2 pt-1">
+                <button onclick="closeConfirmModal()" class="flex-1 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold">Batal</button>
+                <button id="confirm-yes-btn" class="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold">Ya, Hapus</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =====================================================================
+         TOAST NOTIFICATION
+    ====================================================================== -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- =====================================================================
+         LOGIKA APLIKASI & SINKRONISASI CLOUD (FIREBASE FIRESTORE)
+    ====================================================================== -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, getDocs, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Konfigurasi Penyimpanan & Versi Skema Klien-Server (Mencegah Ketidakcocokan Frontend-Backend)
+        const STORAGE_MODE = 'FIREBASE';
+        const CLIENT_SCHEMA_VERSION = 2;
+        const CLASSES = ['7.1', '7.3', '7.4', '7.5', '7.6', '7.7'];
+        const WORKSPACE_PREF_KEY = 'smp_gradebook_workspace_code_v1';
+        const getStorageKey = (wsCode) => `smp_gradebook_data_${wsCode}_v2`;
+        const getPendingQueueKey = (wsCode) => `smp_gradebook_pending_${wsCode}_v2`;
+
+        // Baca Kode Ruang dari parameter URL (?ruang=... / #ruang=...) terlebih dahulu agar sinkron saat dibuka di perangkat lain
+        function extractWorkspaceFromUrl() {
+            try {
+                const urlObj = new URL(window.location.href);
+                const queryWs = urlObj.searchParams.get('ruang') || urlObj.searchParams.get('workspace');
+                if (queryWs) return queryWs;
+                if (window.location.hash && window.location.hash.includes('ruang=')) {
+                    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+                    const hashWs = hashParams.get('ruang');
+                    if (hashWs) return hashWs;
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        const urlWorkspaceCode = extractWorkspaceFromUrl();
+        const savedWorkspaceCode = (urlWorkspaceCode || localStorage.getItem(WORKSPACE_PREF_KEY) || 'SMP7-UTAMA')
+            .toUpperCase()
+            .replace(/[^A-Z0-9_-]/g, '') || 'SMP7-UTAMA';
+        localStorage.setItem(WORKSPACE_PREF_KEY, savedWorkspaceCode);
+
+        // State Utama Aplikasi
+        let appState = {
+            workspaceCode: savedWorkspaceCode,
+            activeClass: '7.1',
+            activeView: 'input', // 'input' | 'analytics'
+            lastSavedAt: null,
+            revision: 0,
+            schemaVersion: CLIENT_SCHEMA_VERSION,
+            settings: {
+                schoolName: 'SMP NEGERI 1 CIOMAS',
+                subject: 'Ilmu Pengetahuan Alam (IPA)',
+                semester: 'Ganjil',
+                academicYear: '2026/2027',
+                teacherName: 'Budi Santoso, S.Pd.',
+                teacherNip: '19850412 201001 1 014',
+                principalName: 'Dra. Hj. Siti Aminah, M.Pd.',
+                principalNip: '19700817 199802 2 003',
+                cityDate: 'Jakarta, 24 November 2026',
+                kktp: 75,
+                weights: { nh: 30, uh: 30, pts: 20, pas: 20 }
+            },
+            students: []
+        };
+
+        // Variabel Firebase & Kontrol Sinkronisasi Paralel (Multi-lane tanpa menunggu antrean tunggal)
+        let db = null;
+        let auth = null;
+        let currentUser = null;
+        let docRef = null;
+        let unsubscribeSnapshot = null;
+        let unsubscribeStudentsSnapshot = null;
+        let isApplyingRemote = false;
+        let hasUnsavedChanges = false;
+        let isCloudReady = false;
+        let saveTimeout = null;
+        const activeLaneWrites = new Map(); // Jalur penulisan paralel per entitas (settings / studentId)
+        const pendingStudentSyncIds = new Set(); // Daftar ID siswa yang berubah & siap dikirim paralel
+        let pendingMetaSync = false;
+
+        function sanitizeWorkspaceCode(code) {
+            const cleaned = String(code || 'SMP7-UTAMA').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 32);
+            return cleaned || 'SMP7-UTAMA';
+        }
+
+        // Normalisasi & Migrasi Skema Otomatis (Menyelaraskan versi Klien & Server tanpa konflik)
+        function normalizeStudentRecord(raw, fallbackClass = '7.1') {
+            const nhRaw = Array.isArray(raw?.nh) ? raw.nh : [null, null, null, null];
+            const uhRaw = Array.isArray(raw?.uh) ? raw.uh : [null, null, null];
+            return {
+                id: String(raw?.id || `std_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`),
+                className: CLASSES.includes(raw?.className) ? raw.className : fallbackClass,
+                nis: String(raw?.nis || ''),
+                name: String(raw?.name || 'Siswa'),
+                gender: raw?.gender === 'P' ? 'P' : 'L',
+                nh: [0, 1, 2, 3].map(i => (nhRaw[i] !== undefined && nhRaw[i] !== '' ? (nhRaw[i] === null ? null : Number(nhRaw[i])) : null)),
+                uh: [0, 1, 2].map(i => (uhRaw[i] !== undefined && uhRaw[i] !== '' ? (uhRaw[i] === null ? null : Number(uhRaw[i])) : null)),
+                pts: raw?.pts !== undefined && raw?.pts !== '' && raw?.pts !== null ? Number(raw.pts) : null,
+                pas: raw?.pas !== undefined && raw?.pas !== '' && raw?.pas !== null ? Number(raw.pas) : null,
+                updatedAt: Number(raw?.updatedAt || 0),
+                deleted: Boolean(raw?.deleted),
+                schemaVersion: Math.max(CLIENT_SCHEMA_VERSION, Number(raw?.schemaVersion || 1))
+            };
+        }
+
+        function reconcileSettingsWithServer(serverSettings = {}) {
+            const defaultWeights = { nh: 30, uh: 30, pts: 20, pas: 20 };
+            return {
+                ...appState.settings,
+                ...serverSettings,
+                kktp: Number(serverSettings.kktp ?? appState.settings.kktp ?? 75),
+                weights: {
+                    ...defaultWeights,
+                    ...(appState.settings.weights || {}),
+                    ...(serverSettings.weights || {})
+                }
+            };
+        }
+
+        function syncWorkspaceUrl(wsCode) {
+            try {
+                const urlObj = new URL(window.location.href);
+                urlObj.searchParams.set('ruang', wsCode);
+                window.history.replaceState({}, '', urlObj.toString());
+            } catch (e) {}
+        }
+
+        function setPendingQueueFlag(wsCode, isPending) {
+            try {
+                if (isPending) {
+                    localStorage.setItem(getPendingQueueKey(wsCode), '1');
+                } else {
+                    localStorage.removeItem(getPendingQueueKey(wsCode));
+                }
+            } catch (e) {}
+        }
+
+        function hasPendingQueueFlag(wsCode) {
+            try {
+                return localStorage.getItem(getPendingQueueKey(wsCode)) === '1';
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function saveLocalWorkspaceData(wsCode = appState.workspaceCode) {
+            try {
+                const payload = {
+                    workspaceCode: wsCode,
+                    schemaVersion: CLIENT_SCHEMA_VERSION,
+                    settings: appState.settings,
+                    students: appState.students,
+                    lastSavedAt: appState.lastSavedAt,
+                    revision: appState.revision || 0
+                };
+                localStorage.setItem(getStorageKey(wsCode), JSON.stringify(payload));
+                localStorage.setItem(WORKSPACE_PREF_KEY, wsCode);
+            } catch (e) {
+                console.warn('Gagal menyimpan ke localStorage:', e);
+            }
+        }
+
+        // Data awal realistis untuk kelas 7.1, 7.3, 7.4, 7.5, 7.6, dan 7.7
+        function generateDefaultStudents() {
+            const sampleNames = {
+                '7.1': [
+                    ['262707101', 'Aditya Pratama', 'L'],
+                    ['262707102', 'Alya Rahmawati', 'P'],
+                    ['262707103', 'Bagas Saputra', 'L'],
+                    ['262707104', 'Citra Kirana Dewi', 'P'],
+                    ['262707105', 'Dimas Anggara', 'L']
+                ],
+                '7.3': [
+                    ['262707301', 'Eka Putri Maharani', 'P'],
+                    ['262707302', 'Fajar Nugroho', 'L'],
+                    ['262707303', 'Gita Permatasari', 'P'],
+                    ['262707304', 'Hendra Wijaya', 'L']
+                ],
+                '7.4': [
+                    ['262707401', 'Intan Nuraini', 'P'],
+                    ['262707402', 'Joko Susilo', 'L'],
+                    ['262707403', 'Kartika Sari', 'P'],
+                    ['262707404', 'Lukman Hakim', 'L']
+                ],
+                '7.5': [
+                    ['262707501', 'Maya Novita', 'P'],
+                    ['262707502', 'Naufal Zaki', 'L'],
+                    ['262707503', 'Olivia Rahma', 'P'],
+                    ['262707504', 'Putra Ramadhan', 'L']
+                ],
+                '7.6': [
+                    ['262707601', 'Qonita Zahra', 'P'],
+                    ['262707602', 'Rizky Hidayat', 'L'],
+                    ['262707603', 'Salsa Nabila', 'P'],
+                    ['262707604', 'Taufik Hidayat', 'L']
+                ],
+                '7.7': [
+                    ['262707701', 'Umar Faruq', 'L'],
+                    ['262707702', 'Vina Oktaviani', 'P'],
+                    ['262707703', 'Wahyu Setiawan', 'L'],
+                    ['262707704', 'Zahra Aulia', 'P']
+                ]
+            };
+
+            const list = [];
+            CLASSES.forEach((cls, cIdx) => {
+                (sampleNames[cls] || []).forEach((item, idx) => {
+                    const base = 74 + ((cIdx * 3 + idx * 5) % 18);
+                    list.push(normalizeStudentRecord({
+                        id: `std_${cls.replace('.', '')}_${idx + 1}`,
+                        className: cls,
+                        nis: item[0],
+                        name: item[1],
+                        gender: item[2],
+                        nh: [Math.min(100, base + 2), Math.min(100, base + 4), Math.min(100, base), Math.min(100, base + 3)],
+                        uh: [Math.min(100, base - 1), Math.min(100, base + 2), Math.min(100, base + 1)],
+                        pts: Math.min(100, base),
+                        pas: Math.min(100, base + 2),
+                        updatedAt: 0
+                    }, cls));
+                });
+            });
+            return list;
+        }
+
+        function loadLocalWorkspaceData(wsCode = appState.workspaceCode) {
+            appState.workspaceCode = wsCode;
+            try {
+                const raw = localStorage.getItem(getStorageKey(wsCode));
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.settings) {
+                        appState.settings = reconcileSettingsWithServer(parsed.settings);
+                    }
+                    if (Array.isArray(parsed.students)) {
+                        appState.students = parsed.students.map(s => normalizeStudentRecord(s));
+                    }
+                    appState.lastSavedAt = parsed.lastSavedAt || null;
+                    appState.revision = Number(parsed.revision || 0);
+                    appState.schemaVersion = CLIENT_SCHEMA_VERSION;
+                    return true;
+                }
+            } catch (e) {
+                console.warn('Gagal membaca cache lokal:', e);
+            }
+            // Jika belum ada cache lokal untuk ruang ini, siapkan contoh awal dengan revision 0 agar data cloud lebih diprioritaskan
+            appState.students = generateDefaultStudents();
+            appState.revision = 0;
+            appState.lastSavedAt = null;
+            return false;
+        }
+
+        // =====================================================================
+        // INISIALISASI FIREBASE & SINKRONISASI REAL-TIME LINTAS PERANGKAT
+        // =====================================================================
+        async function initCloudSync() {
+            const wsCode = appState.workspaceCode;
+            syncWorkspaceUrl(wsCode);
+
+            try {
+                if (STORAGE_MODE === 'FIREBASE' && typeof __firebase_config !== 'undefined' && __firebase_config) {
+                    const firebaseConfig = JSON.parse(__firebase_config);
+                    const app = initializeApp(firebaseConfig);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+
+                    currentUser = auth.currentUser;
+                    if (!currentUser) {
+                        updateSyncBadge('local', 'Mode Lokal (Perlu Koneksi / Cek Kode Ruang)');
+                        return;
+                    }
+
+                    isCloudReady = true;
+                    await attachWorkspaceListener(wsCode);
+                } else {
+                    updateSyncBadge('local', 'Mode Lokal (Perlu Koneksi / Cek Kode Ruang)');
+                }
+            } catch (err) {
+                console.warn('Cloud sync fallback ke lokal:', err);
+                setPendingQueueFlag(wsCode, true);
+                updateSyncBadge('error', 'Gagal Simpan ke Cloud (Tersimpan Lokal)');
+            }
+        }
+
+        async function attachWorkspaceListener(wsCode) {
+            if (unsubscribeSnapshot) {
+                unsubscribeSnapshot();
+                unsubscribeSnapshot = null;
+            }
+            if (unsubscribeStudentsSnapshot) {
+                unsubscribeStudentsSnapshot();
+                unsubscribeStudentsSnapshot = null;
+            }
+
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-smp-gradebook';
+            const safeDocId = `workspace_${wsCode}`;
+            docRef = doc(db, 'artifacts', appId, 'public', 'data', 'smp_gradebook_spaces', safeDocId);
+            const studentsColRef = collection(db, 'artifacts', appId, 'public', 'data', `smp_gradebook_students_${wsCode}`);
+
+            try {
+                const [snap, studentsSnap] = await Promise.all([
+                    getDoc(docRef),
+                    getDocs(studentsColRef)
+                ]);
+
+                const remoteMap = new Map();
+                studentsSnap.forEach(d => {
+                    const norm = normalizeStudentRecord({ id: d.id, ...d.data() });
+                    remoteMap.set(norm.id, norm);
+                });
+
+                if (snap.exists()) {
+                    const remoteData = snap.data();
+                    const remoteSchema = Number(remoteData.schemaVersion || 1);
+                    const remoteRev = Number(remoteData.revision || 0);
+                    const localRev = Number(appState.revision || 0);
+
+                    // Migrasi skema lama (v1 array tunggal) ke skema paralel v2 jika sub-dokumen belum lengkap
+                    if (Array.isArray(remoteData.students)) {
+                        remoteData.students.forEach(s => {
+                            const norm = normalizeStudentRecord(s);
+                            const existing = remoteMap.get(norm.id);
+                            if (!existing || norm.updatedAt > existing.updatedAt) {
+                                remoteMap.set(norm.id, norm);
+                            }
+                        });
+                    }
+
+                    if ((hasPendingQueueFlag(wsCode) || hasUnsavedChanges) && localRev > remoteRev) {
+                        appState.students.forEach(s => pendingStudentSyncIds.add(s.id));
+                        pendingMetaSync = true;
+                        await flushToCloud(wsCode);
+                    } else {
+                        mergeRemoteState(remoteData, remoteMap, wsCode);
+                        // Otomatis selaraskan versi skema server jika masih versi lama
+                        if (remoteSchema < CLIENT_SCHEMA_VERSION) {
+                            pendingMetaSync = true;
+                            appState.students.forEach(s => pendingStudentSyncIds.add(s.id));
+                            flushToCloud(wsCode);
+                        }
+                    }
+                } else {
+                    if (Number(appState.revision || 0) < 1) {
+                        appState.revision = 1;
+                    }
+                    pendingMetaSync = true;
+                    appState.students.forEach(s => pendingStudentSyncIds.add(s.id));
+                    await flushToCloud(wsCode);
+                }
+            } catch (err) {
+                console.warn('Initial sync warning:', err);
+            }
+
+            // Listener 1: Pengaturan & Metadata Ruang Kerja
+            unsubscribeSnapshot = onSnapshot(docRef, (snapshot) => {
+                if (!snapshot.exists()) return;
+                const remoteData = snapshot.data();
+                if (!remoteData) return;
+
+                const remoteRev = Number(remoteData.revision || 0);
+                const localRev = Number(appState.revision || 0);
+
+                if (!pendingMetaSync && remoteRev >= localRev) {
+                    isApplyingRemote = true;
+                    appState.settings = reconcileSettingsWithServer(remoteData.settings || {});
+                    appState.revision = Math.max(localRev, remoteRev);
+                    appState.schemaVersion = Math.max(CLIENT_SCHEMA_VERSION, Number(remoteData.schemaVersion || CLIENT_SCHEMA_VERSION));
+                    appState.lastSavedAt = remoteData.updatedAt || appState.lastSavedAt || new Date().toISOString();
+                    saveLocalWorkspaceData(wsCode);
+                    renderAll();
+                    isApplyingRemote = false;
+                }
+
+                if (!hasPendingQueueFlag(wsCode) && activeLaneWrites.size === 0) {
+                    updateSyncBadge('synced', `Tersinkron Otomatis (Skema v${appState.schemaVersion}.0)`);
+                }
+            }, (error) => {
+                console.error('Firestore meta listener error:', error);
+                updateSyncBadge('error', 'Gagal Simpan ke Cloud (Tersimpan Lokal)');
+            });
+
+            // Listener 2: Sinkronisasi Paralel Per Siswa (Konflik antar-baris dihindari)
+            unsubscribeStudentsSnapshot = onSnapshot(studentsColRef, (querySnap) => {
+                let changed = false;
+                isApplyingRemote = true;
+
+                querySnap.docChanges().forEach(change => {
+                    const data = normalizeStudentRecord({ id: change.doc.id, ...change.doc.data() });
+                    // Abaikan jika siswa ini sedang dalam proses dikirim oleh perangkat lokal
+                    if (pendingStudentSyncIds.has(data.id) || activeLaneWrites.has(`student_${data.id}`)) {
+                        return;
+                    }
+
+                    const idx = appState.students.findIndex(s => s.id === data.id);
+                    if (change.type === 'removed' || data.deleted) {
+                        if (idx !== -1) {
+                            appState.students.splice(idx, 1);
+                            changed = true;
+                        }
+                    } else if (idx === -1) {
+                        appState.students.push(data);
+                        changed = true;
+                    } else {
+                        const localItem = appState.students[idx];
+                        if (Number(data.updatedAt || 0) >= Number(localItem.updatedAt || 0)) {
+                            appState.students[idx] = data;
+                            changed = true;
+                        }
+                    }
+                });
+
+                if (changed) {
+                    appState.lastSavedAt = new Date().toISOString();
+                    saveLocalWorkspaceData(wsCode);
+                    renderAll();
+                }
+                isApplyingRemote = false;
+            }, (error) => {
+                console.error('Firestore students listener error:', error);
+            });
+        }
+
+        function mergeRemoteState(remoteData, remoteStudentMap, wsCode) {
+            isApplyingRemote = true;
+            appState.settings = reconcileSettingsWithServer(remoteData.settings || {});
+            appState.revision = Math.max(Number(appState.revision || 0), Number(remoteData.revision || 1));
+            appState.schemaVersion = Math.max(CLIENT_SCHEMA_VERSION, Number(remoteData.schemaVersion || CLIENT_SCHEMA_VERSION));
+            appState.lastSavedAt = remoteData.updatedAt || appState.lastSavedAt || new Date().toISOString();
+
+            const mergedList = [];
+            remoteStudentMap.forEach(st => {
+                if (!st.deleted) mergedList.push(st);
+            });
+
+            if (mergedList.length > 0 || remoteData.initializedEmpty) {
+                appState.students = mergedList;
+            }
+
+            saveLocalWorkspaceData(wsCode);
+            setPendingQueueFlag(wsCode, false);
+            renderAll();
+            isApplyingRemote = false;
+            updateSyncBadge('synced', `Tersinkron Otomatis (Skema v${appState.schemaVersion}.0)`);
+        }
+
+        // Jalankan penulisan paralel non-blocking per jalur (tanpa menunggu antrean tunggal)
+        function dispatchParallelLane(laneKey, writeTask) {
+            const previousTask = activeLaneWrites.get(laneKey) || Promise.resolve();
+            const currentTask = previousTask.then(writeTask, writeTask).finally(() => {
+                if (activeLaneWrites.get(laneKey) === currentTask) {
+                    activeLaneWrites.delete(laneKey);
+                }
+            });
+            activeLaneWrites.set(laneKey, currentTask);
+            return currentTask;
+        }
+
+        async function flushToCloud(targetWsCode = null) {
+            const wsCode = sanitizeWorkspaceCode(targetWsCode || appState.workspaceCode);
+            saveLocalWorkspaceData(wsCode);
+
+            if (!db || !currentUser || !isCloudReady || typeof __firebase_config === 'undefined' || !__firebase_config) {
+                setPendingQueueFlag(wsCode, true);
+                updateSyncBadge('local', 'Mode Lokal (Perlu Koneksi / Cek Kode Ruang)');
+                return false;
+            }
+
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-smp-gradebook';
+            const targetMetaRef = doc(db, 'artifacts', appId, 'public', 'data', 'smp_gradebook_spaces', `workspace_${wsCode}`);
+            const nowIso = new Date().toISOString();
+            const revisionToWrite = Math.max(1, Number(appState.revision || 1));
+            appState.revision = revisionToWrite;
+            appState.lastSavedAt = nowIso;
+
+            updateSyncBadge('syncing', 'Menyimpan Paralel...');
+            const parallelJobs = [];
+
+            // 1. Jalur Metadata & Pengaturan (Berjalan paralel tanpa memblokir input nilai siswa)
+            if (pendingMetaSync || activeLaneWrites.size === 0) {
+                pendingMetaSync = false;
+                parallelJobs.push(dispatchParallelLane(`meta_${wsCode}`, async () => {
+                    const metaPayload = JSON.parse(JSON.stringify({
+                        workspaceCode: wsCode,
+                        schemaVersion: CLIENT_SCHEMA_VERSION,
+                        settings: appState.settings,
+                        initializedEmpty: appState.students.length === 0,
+                        revision: revisionToWrite,
+                        updatedAt: nowIso,
+                        updatedBy: currentUser.uid || 'device'
+                    }));
+                    await setDoc(targetMetaRef, metaPayload, { merge: true });
+                }));
+            }
+
+            // 2. Jalur Paralel Per Siswa (Setiap siswa memiliki jalur penulisan independen)
+            const idsToSync = Array.from(pendingStudentSyncIds);
+            pendingStudentSyncIds.clear();
+
+            idsToSync.forEach(studentId => {
+                const studentObj = appState.students.find(s => s.id === studentId);
+                const studentDocRef = doc(db, 'artifacts', appId, 'public', 'data', `smp_gradebook_students_${wsCode}`, studentId);
+
+                parallelJobs.push(dispatchParallelLane(`student_${studentId}`, async () => {
+                    if (!studentObj) {
+                        await setDoc(studentDocRef, {
+                            id: studentId,
+                            deleted: true,
+                            schemaVersion: CLIENT_SCHEMA_VERSION,
+                            updatedAt: Date.now()
+                        }, { merge: true });
+                    } else {
+                        const cleanStudent = JSON.parse(JSON.stringify(normalizeStudentRecord({
+                            ...studentObj,
+                            deleted: false,
+                            schemaVersion: CLIENT_SCHEMA_VERSION,
+                            updatedAt: studentObj.updatedAt || Date.now()
+                        })));
+                        await setDoc(studentDocRef, cleanStudent, { merge: true });
+                    }
+                }));
+            });
+
+            try {
+                await Promise.all(parallelJobs);
+                if (pendingStudentSyncIds.size === 0 && !pendingMetaSync) {
+                    hasUnsavedChanges = false;
+                    setPendingQueueFlag(wsCode, false);
+                    saveLocalWorkspaceData(wsCode);
+                    updateLastSavedUI();
+                    updateSyncBadge('synced', `Tersinkron Otomatis (Skema v${CLIENT_SCHEMA_VERSION}.0)`);
+                }
+                return true;
+            } catch (e) {
+                console.error('Gagal sinkronisasi paralel ke cloud:', e);
+                idsToSync.forEach(id => pendingStudentSyncIds.add(id));
+                setPendingQueueFlag(wsCode, true);
+                updateSyncBadge('error', 'Gagal Simpan ke Cloud (Tersimpan Lokal)');
+                return false;
+            }
+        }
+
+        // Simpan perubahan ke LocalStorage & picu pengiriman paralel ke Cloud Firestore
+        function persistData(immediate = false, changedStudentIds = null, metaChanged = false) {
+            if (isApplyingRemote) return;
+
+            if (Array.isArray(changedStudentIds)) {
+                changedStudentIds.forEach(id => pendingStudentSyncIds.add(id));
+            }
+            if (metaChanged) {
+                pendingMetaSync = true;
+            }
+
+            appState.revision = Number(appState.revision || 0) + 1;
+            appState.lastSavedAt = new Date().toISOString();
+            hasUnsavedChanges = true;
+            setPendingQueueFlag(appState.workspaceCode, true);
+            saveLocalWorkspaceData(appState.workspaceCode);
+            updateLastSavedUI();
+
+            clearTimeout(saveTimeout);
+            if (immediate) {
+                flushToCloud(appState.workspaceCode);
+            } else {
+                updateSyncBadge('syncing', 'Menyimpan Paralel...');
+                saveTimeout = setTimeout(() => {
+                    flushToCloud(appState.workspaceCode);
+                }, 150);
+            }
+        }
+
+        // Tombol Simpan & Sinkronkan Eksplisit dari Header/Modal
+        window.forceSaveAndSync = async function() {
+            clearTimeout(saveTimeout);
+            appState.revision = Number(appState.revision || 0) + 1;
+            appState.lastSavedAt = new Date().toISOString();
+            hasUnsavedChanges = true;
+            pendingMetaSync = true;
+            appState.students.forEach(s => pendingStudentSyncIds.add(s.id));
+            saveLocalWorkspaceData(appState.workspaceCode);
+            updateLastSavedUI();
+
+            const ok = await flushToCloud(appState.workspaceCode);
+            if (ok) {
+                showToast(`Semua data di ruang "${appState.workspaceCode}" tersimpan paralel ke Cloud`, 'success');
+            } else {
+                showToast('Tersimpan di perangkat lokal. Akan disinkronkan saat koneksi tersedia.', 'info');
+            }
+        };
+
+        function updateSyncBadge(status, text) {
+            const badge = document.getElementById('sync-status');
+            const dot = document.getElementById('sync-dot');
+            const label = document.getElementById('sync-text');
+            if (!badge || !dot || !label) return;
+
+            label.textContent = text;
+            badge.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition';
+            if (status === 'synced') {
+                badge.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+            } else if (status === 'syncing') {
+                badge.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
+                dot.className = 'w-2 h-2 rounded-full bg-blue-500 animate-ping';
+            } else if (status === 'error') {
+                badge.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-200');
+                dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+            } else {
+                badge.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
+                dot.className = 'w-2 h-2 rounded-full bg-amber-500';
+            }
+        }
+
+        function updateLastSavedUI() {
+            const el = document.getElementById('last-saved-label');
+            if (!el) return;
+            if (!appState.lastSavedAt) {
+                el.innerHTML = '<i class="fa-regular fa-clock mr-1"></i> Terakhir disimpan: Belum tersimpan';
+                return;
+            }
+            try {
+                const d = new Date(appState.lastSavedAt);
+                const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const dateStr = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+                el.innerHTML = `<i class="fa-regular fa-clock mr-1 text-emerald-600"></i> Terakhir disimpan: <strong>${dateStr}, ${timeStr}</strong>`;
+            } catch (e) {
+                el.innerHTML = `<i class="fa-regular fa-clock mr-1"></i> Terakhir disimpan: Baru saja`;
+            }
+        }
+
+        // =====================================================================
+        // MANAJEMEN KODE RUANG KERJA (WORKSPACE) & BACKUP/RESTORE JSON
+        // =====================================================================
+        window.openWorkspaceModal = function() {
+            document.getElementById('workspace-code-input').value = appState.workspaceCode;
+            document.getElementById('workspace-modal').classList.remove('hidden');
+        };
+
+        window.closeWorkspaceModal = function() {
+            document.getElementById('workspace-modal').classList.add('hidden');
+        };
+
+        window.generateRandomWorkspaceCode = function() {
+            const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+            document.getElementById('workspace-code-input').value = `SMP7-${rand}`;
+        };
+
+        window.copyWorkspaceCode = function() {
+            const input = document.getElementById('workspace-code-input');
+            input.select();
+            input.setSelectionRange(0, 99);
+            try {
+                document.execCommand('copy');
+                showToast(`Kode Ruang "${input.value}" disalin ke clipboard`, 'success');
+            } catch (e) {
+                showToast('Gagal menyalin kode', 'error');
+            }
+        };
+
+        window.copyShareableWorkspaceLink = function() {
+            const code = sanitizeWorkspaceCode(document.getElementById('workspace-code-input').value || appState.workspaceCode);
+            const urlObj = new URL(window.location.href);
+            urlObj.searchParams.set('ruang', code);
+            const shareUrl = urlObj.toString();
+
+            const tempInput = document.createElement('input');
+            tempInput.value = shareUrl;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            tempInput.setSelectionRange(0, 999);
+            try {
+                document.execCommand('copy');
+                showToast(`Tautan Ruang "${code}" disalin! Buka link ini di HP/Laptop lain.`, 'success');
+            } catch (e) {
+                showToast('Gagal menyalin tautan', 'error');
+            }
+            document.body.removeChild(tempInput);
+        };
+
+        window.applyWorkspaceCode = async function() {
+            const rawVal = document.getElementById('workspace-code-input').value;
+            const newCode = sanitizeWorkspaceCode(rawVal);
+            document.getElementById('workspace-code-input').value = newCode;
+
+            clearTimeout(saveTimeout);
+            pendingStudentSyncIds.clear();
+            pendingMetaSync = false;
+            hasUnsavedChanges = false;
+
+            loadLocalWorkspaceData(newCode);
+            syncWorkspaceUrl(newCode);
+            renderAll();
+            closeWorkspaceModal();
+            showToast(`Beralih ke Kode Ruang "${newCode}"...`, 'info');
+
+            if (isCloudReady && db && currentUser) {
+                updateSyncBadge('syncing', 'Menghubungkan Ruang...');
+                await attachWorkspaceListener(newCode);
+            } else {
+                await initCloudSync();
+            }
+        };
+
+        window.exportBackupJSON = function() {
+            const backupObj = {
+                app: 'BukuNilaiSMP',
+                schemaVersion: CLIENT_SCHEMA_VERSION,
+                workspaceCode: appState.workspaceCode,
+                exportedAt: new Date().toISOString(),
+                settings: appState.settings,
+                students: appState.students
+            };
+            const blob = new Blob([JSON.stringify(backupObj, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Backup_Nilai_SMP_${appState.workspaceCode}_${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('File cadangan JSON berhasil diunduh', 'success');
+        };
+
+        window.importBackupJSON = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (!parsed || !Array.isArray(parsed.students)) {
+                        showToast('Format file JSON tidak valid', 'error');
+                        return;
+                    }
+                    if (parsed.settings) {
+                        appState.settings = reconcileSettingsWithServer(parsed.settings);
+                    }
+                    appState.students = parsed.students.map(s => normalizeStudentRecord({
+                        ...s,
+                        updatedAt: Date.now()
+                    }));
+                    renderAll();
+                    persistData(true, appState.students.map(s => s.id), true);
+                    closeWorkspaceModal();
+                    showToast(`Berhasil memulihkan ${appState.students.length} data siswa ke ruang "${appState.workspaceCode}"`, 'success');
+                } catch (err) {
+                    showToast('Gagal membaca file JSON', 'error');
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        };
+
+        // =====================================================================
+        // KALKULASI NILAI HARIAN, ULANGAN HARIAN, SEMESTER & RAPOR
+        // =====================================================================
+        function calcAverage(arr) {
+            const valid = (arr || []).filter(v => v !== null && v !== '' && !isNaN(Number(v))).map(Number);
+            if (valid.length === 0) return null;
+            const sum = valid.reduce((a, b) => a + b, 0);
+            return sum / valid.length;
+        }
+
+        function computeStudentGrades(student) {
+            const avgNH = calcAverage(student.nh);
+            const avgUH = calcAverage(student.uh);
+            const pts = student.pts !== null && student.pts !== '' && !isNaN(Number(student.pts)) ? Number(student.pts) : null;
+            const pas = student.pas !== null && student.pas !== '' && !isNaN(Number(student.pas)) ? Number(student.pas) : null;
+
+            const w = appState.settings.weights;
+            let weightedSum = 0;
+            let totalWeightUsed = 0;
+
+            if (avgNH !== null) { weightedSum += avgNH * w.nh; totalWeightUsed += w.nh; }
+            if (avgUH !== null) { weightedSum += avgUH * w.uh; totalWeightUsed += w.uh; }
+            if (pts !== null)   { weightedSum += pts * w.pts;  totalWeightUsed += w.pts; }
+            if (pas !== null)   { weightedSum += pas * w.pas;  totalWeightUsed += w.pas; }
+
+            const finalScore = totalWeightUsed > 0 ? Math.round((weightedSum / totalWeightUsed) * 10) / 10 : null;
+            const kktp = Number(appState.settings.kktp) || 75;
+
+            let predicate = '-';
+            if (finalScore !== null) {
+                if (finalScore >= 90) predicate = 'A';
+                else if (finalScore >= 80) predicate = 'B';
+                else if (finalScore >= kktp) predicate = 'C';
+                else predicate = 'D';
+            }
+
+            const status = finalScore === null ? 'Belum Lengkap' : (finalScore >= kktp ? 'Tuntas' : 'Remedial');
+
+            return { avgNH, avgUH, pts, pas, finalScore, predicate, status };
+        }
+
+        function formatNum(val) {
+            return val === null || val === undefined ? '-' : Number(val).toFixed(1).replace(/\.0$/, '');
+        }
+
+        // =====================================================================
+        // RENDER ANTARMUKA PENGGUNA (TABS, STATISTIK, TABEL NILAI)
+        // =====================================================================
+        function renderAll() {
+            renderHeaderBanner();
+            renderClassTabs();
+            renderStats();
+            renderTable();
+            if (appState.activeView === 'analytics') {
+                renderAnalytics();
+            }
+        }
+
+        function renderHeaderBanner() {
+            const s = appState.settings;
+            document.getElementById('disp-mapel').textContent = s.subject;
+            document.getElementById('disp-semester').textContent = `${s.semester} • ${s.academicYear}`;
+            document.getElementById('disp-kktp').textContent = s.kktp;
+            document.getElementById('disp-bobot').textContent = `NH ${s.weights.nh}% | UH ${s.weights.uh}% | PTS ${s.weights.pts}% | PAS ${s.weights.pas}%`;
+
+            const wsHeader = document.getElementById('header-workspace-code');
+            if (wsHeader) wsHeader.textContent = appState.workspaceCode;
+            const schemaBadge = document.getElementById('schema-badge');
+            if (schemaBadge) schemaBadge.textContent = `v${appState.schemaVersion || CLIENT_SCHEMA_VERSION}.0`;
+            updateLastSavedUI();
+
+            document.querySelectorAll('.active-class-label').forEach(el => el.textContent = appState.activeClass);
+        }
+
+        function renderClassTabs() {
+            const container = document.getElementById('class-tabs');
+            container.innerHTML = CLASSES.map(cls => {
+                const count = appState.students.filter(st => st.className === cls).length;
+                const isActive = appState.activeClass === cls;
+                return `
+                    <button onclick="selectClass('${cls}')" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap flex items-center gap-2 ${
+                        isActive
+                            ? 'bg-blue-600 text-white shadow-sm'
+                            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    }">
+                        <span>Kelas ${cls}</span>
+                        <span class="px-1.5 py-0.5 rounded-md text-[10px] ${isActive ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}">${count}</span>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        window.selectClass = function(cls) {
+            appState.activeClass = cls;
+            renderAll();
+        };
+
+        window.switchView = function(view) {
+            appState.activeView = view;
+            const inputSec = document.getElementById('view-input');
+            const analyticsSec = document.getElementById('view-analytics');
+            const btnInput = document.getElementById('view-btn-input');
+            const btnAnalytics = document.getElementById('view-btn-analytics');
+
+            if (view === 'input') {
+                inputSec.classList.remove('hidden');
+                analyticsSec.classList.add('hidden');
+                btnInput.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-xs transition flex items-center gap-1.5';
+                btnAnalytics.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5';
+            } else {
+                inputSec.classList.add('hidden');
+                analyticsSec.classList.remove('hidden');
+                btnAnalytics.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-xs transition flex items-center gap-1.5';
+                btnInput.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition flex items-center gap-1.5';
+                renderAnalytics();
+            }
+        };
+
+        function renderStats() {
+            const classStudents = appState.students.filter(st => st.className === appState.activeClass);
+            const total = classStudents.length;
+            const male = classStudents.filter(st => st.gender === 'L').length;
+            const female = classStudents.filter(st => st.gender === 'P').length;
+
+            const computed = classStudents.map(computeStudentGrades);
+            const validFinals = computed.filter(c => c.finalScore !== null).map(c => c.finalScore);
+            const avg = validFinals.length ? (validFinals.reduce((a, b) => a + b, 0) / validFinals.length) : 0;
+            const maxScore = validFinals.length ? Math.max(...validFinals).toFixed(1) : '-';
+            const minScore = validFinals.length ? Math.min(...validFinals).toFixed(1) : '-';
+
+            const passed = computed.filter(c => c.status === 'Tuntas').length;
+            const remedial = computed.filter(c => c.status === 'Remedial').length;
+            const passPct = total > 0 ? Math.round((passed / total) * 100) : 0;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-gender').textContent = `${male} Laki-laki • ${female} Perempuan`;
+            document.getElementById('stat-avg').textContent = avg.toFixed(1);
+            document.getElementById('stat-minmax').textContent = `Tertinggi: ${maxScore} • Terendah: ${minScore}`;
+            document.getElementById('stat-pass').textContent = passed;
+            document.getElementById('stat-pass-pct').textContent = `${passPct}% ketuntasan klasikal`;
+            document.getElementById('stat-remedial').textContent = remedial;
+        }
+
+        window.renderTable = function() {
+            const search = (document.getElementById('search-student').value || '').toLowerCase();
+            const statusFilter = document.getElementById('filter-status').value;
+            const tbody = document.getElementById('grades-tbody');
+            const emptyState = document.getElementById('empty-state');
+
+            const filtered = appState.students.filter(st => {
+                if (st.className !== appState.activeClass) return false;
+                if (search && !st.name.toLowerCase().includes(search) && !(st.nis || '').toLowerCase().includes(search)) return false;
+                if (statusFilter !== 'all') {
+                    const comp = computeStudentGrades(st);
+                    if (statusFilter === 'pass' && comp.status !== 'Tuntas') return false;
+                    if (statusFilter === 'remedial' && comp.status !== 'Remedial') return false;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            tbody.innerHTML = filtered.map((st, index) => {
+                const g = computeStudentGrades(st);
+                const statusBadge = g.status === 'Tuntas'
+                    ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Tuntas</span>'
+                    : g.status === 'Remedial'
+                        ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">Remedial</span>'
+                        : '<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">Kosong</span>';
+
+                const predColor = g.predicate === 'A' ? 'text-emerald-700 font-extrabold'
+                    : g.predicate === 'B' ? 'text-blue-700 font-bold'
+                    : g.predicate === 'C' ? 'text-amber-700 font-bold'
+                    : g.predicate === 'D' ? 'text-rose-700 font-extrabold'
+                    : 'text-slate-400';
+
+                const makeInput = (cat, idx, val, bgTint) => `
+                    <td class="p-1 ${bgTint}">
+                        <input type="number" min="0" max="100" step="1"
+                            value="${val !== null && val !== undefined ? val : ''}"
+                            oninput="updateGrade('${st.id}', '${cat}', ${idx}, this.value, false)"
+                            onchange="updateGrade('${st.id}', '${cat}', ${idx}, this.value, true)"
+                            onblur="updateGrade('${st.id}', '${cat}', ${idx}, this.value, true)"
+                            class="w-12 sm:w-13 text-center py-1 px-1 rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none text-xs font-medium text-slate-800">
+                    </td>
+                `;
+
+                return `
+                    <tr class="hover:bg-slate-50/90 transition group" data-student-row="${st.id}">
+                        <td class="py-2 px-2 text-center font-medium text-slate-500 border-r border-slate-200 sticky left-0 bg-white group-hover:bg-slate-50 z-10">${index + 1}</td>
+                        <td class="py-2 px-3 border-r border-slate-200 sticky left-10 bg-white group-hover:bg-slate-50 z-10">
+                            <div class="font-semibold text-slate-900 leading-snug">${escapeHtml(st.name)}</div>
+                            <div class="text-[10px] text-slate-400">NIS: ${escapeHtml(st.nis || '-')}</div>
+                        </td>
+                        <td class="py-2 px-2 text-center font-semibold text-slate-600 border-r border-slate-200">${st.gender}</td>
+                        ${makeInput('nh', 0, st.nh[0], 'bg-sky-50/30')}
+                        ${makeInput('nh', 1, st.nh[1], 'bg-sky-50/30')}
+                        ${makeInput('nh', 2, st.nh[2], 'bg-sky-50/30')}
+                        ${makeInput('nh', 3, st.nh[3], 'bg-sky-50/30')}
+                        <td id="avg-nh-${st.id}" class="py-2 px-1.5 text-center font-bold text-sky-900 bg-sky-50/80 border-r border-slate-200">${formatNum(g.avgNH)}</td>
+                        ${makeInput('uh', 0, st.uh[0], 'bg-indigo-50/30')}
+                        ${makeInput('uh', 1, st.uh[1], 'bg-indigo-50/30')}
+                        ${makeInput('uh', 2, st.uh[2], 'bg-indigo-50/30')}
+                        <td id="avg-uh-${st.id}" class="py-2 px-1.5 text-center font-bold text-indigo-900 bg-indigo-50/80 border-r border-slate-200">${formatNum(g.avgUH)}</td>
+                        ${makeInput('pts', 0, st.pts, 'bg-amber-50/30')}
+                        <td class="p-1 bg-amber-50/30 border-r border-slate-200">
+                            <input type="number" min="0" max="100" step="1"
+                                value="${st.pas !== null && st.pas !== undefined ? st.pas : ''}"
+                                oninput="updateGrade('${st.id}', 'pas', 0, this.value, false)"
+                                onchange="updateGrade('${st.id}', 'pas', 0, this.value, true)"
+                                onblur="updateGrade('${st.id}', 'pas', 0, this.value, true)"
+                                class="w-13 sm:w-14 text-center py-1 px-1 rounded-lg border border-slate-200 bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none text-xs font-medium text-slate-800">
+                        </td>
+                        <td id="final-${st.id}" class="py-2 px-1.5 text-center font-extrabold text-slate-900 bg-emerald-50/60">${formatNum(g.finalScore)}</td>
+                        <td id="pred-${st.id}" class="py-2 px-1.5 text-center ${predColor} bg-emerald-50/60">${g.predicate}</td>
+                        <td id="status-${st.id}" class="py-2 px-2 text-center bg-emerald-50/60 border-r border-slate-200">${statusBadge}</td>
+                        <td class="py-2 px-2 text-center">
+                            <div class="flex items-center justify-center gap-1">
+                                <button onclick="openEditStudentModal('${st.id}')" class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition" title="Edit Biodata Siswa">
+                                    <i class="fa-solid fa-pen text-[11px]"></i>
+                                </button>
+                                <button onclick="confirmDeleteStudent('${st.id}')" class="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition" title="Hapus Siswa">
+                                    <i class="fa-solid fa-trash text-[11px]"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        // Update nilai secara real-time saat mengetik & simpan otomatis
+        window.updateGrade = function(studentId, category, index, rawValue, isCommit = false) {
+            const student = appState.students.find(s => s.id === studentId);
+            if (!student) return;
+
+            let val = rawValue === '' ? null : Number(rawValue);
+            let shouldPersist = true;
+
+            if (val !== null) {
+                if (isNaN(val)) {
+                    val = null;
+                } else if (val < 0) {
+                    val = 0;
+                } else if (val > 100) {
+                    val = 100;
+                }
+            }
+
+            if (category === 'nh') {
+                student.nh[index] = val;
+            } else if (category === 'uh') {
+                student.uh[index] = val;
+            } else if (category === 'pts') {
+                student.pts = val;
+            } else if (category === 'pas') {
+                student.pas = val;
+            }
+            student.updatedAt = Date.now();
+
+            // Perbarui sel hasil perhitungan secara instan tanpa kehilangan fokus input
+            const g = computeStudentGrades(student);
+            const avgNhEl = document.getElementById(`avg-nh-${studentId}`);
+            const avgUhEl = document.getElementById(`avg-uh-${studentId}`);
+            const finalEl = document.getElementById(`final-${studentId}`);
+            const predEl = document.getElementById(`pred-${studentId}`);
+            const statusEl = document.getElementById(`status-${studentId}`);
+
+            if (avgNhEl) avgNhEl.textContent = formatNum(g.avgNH);
+            if (avgUhEl) avgUhEl.textContent = formatNum(g.avgUH);
+            if (finalEl) finalEl.textContent = formatNum(g.finalScore);
+            if (predEl) {
+                predEl.textContent = g.predicate;
+                predEl.className = `py-2 px-1.5 text-center bg-emerald-50/60 ${
+                    g.predicate === 'A' ? 'text-emerald-700 font-extrabold'
+                    : g.predicate === 'B' ? 'text-blue-700 font-bold'
+                    : g.predicate === 'C' ? 'text-amber-700 font-bold'
+                    : g.predicate === 'D' ? 'text-rose-700 font-extrabold'
+                    : 'text-slate-400'
+                }`;
+            }
+            if (statusEl) {
+                statusEl.innerHTML = g.status === 'Tuntas'
+                    ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Tuntas</span>'
+                    : g.status === 'Remedial'
+                        ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">Remedial</span>'
+                        : '<span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">Kosong</span>';
+            }
+
+            renderStats();
+            if (shouldPersist) {
+                persistData(isCommit, [student.id], false);
+            }
+        };
+
+        // =====================================================================
+        // ANALITIK & GRAFIK (CHART.JS)
+        // =====================================================================
+        let classChartInstance = null;
+        let predicateChartInstance = null;
+
+        function renderAnalytics() {
+            const classSummaries = CLASSES.map(cls => {
+                const sts = appState.students.filter(s => s.className === cls);
+                const comps = sts.map(computeStudentGrades);
+
+                const avgOf = (getter) => {
+                    const vals = comps.map(getter).filter(v => v !== null);
+                    return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+                };
+
+                const avgNH = avgOf(c => c.avgNH);
+                const avgUH = avgOf(c => c.avgUH);
+                const avgPTS = avgOf(c => c.pts);
+                const avgPAS = avgOf(c => c.pas);
+                const avgFinal = avgOf(c => c.finalScore);
+                const passed = comps.filter(c => c.status === 'Tuntas').length;
+                const remedial = comps.filter(c => c.status === 'Remedial').length;
+                const pct = sts.length ? Math.round((passed / sts.length) * 100) : 0;
+
+                return { cls, count: sts.length, avgNH, avgUH, avgPTS, avgPAS, avgFinal, passed, remedial, pct };
+            });
+
+            // Tabel Rekapitulasi Seluruh Kelas
+            document.getElementById('recap-tbody').innerHTML = classSummaries.map(r => `
+                <tr class="hover:bg-slate-50">
+                    <td class="py-3 px-4 font-bold text-slate-900">Kelas ${r.cls}</td>
+                    <td class="py-3 px-4 text-center">${r.count}</td>
+                    <td class="py-3 px-4 text-center">${r.avgNH.toFixed(1)}</td>
+                    <td class="py-3 px-4 text-center">${r.avgUH.toFixed(1)}</td>
+                    <td class="py-3 px-4 text-center">${r.avgPTS.toFixed(1)}</td>
+                    <td class="py-3 px-4 text-center">${r.avgPAS.toFixed(1)}</td>
+                    <td class="py-3 px-4 text-center font-extrabold text-blue-700">${r.avgFinal.toFixed(1)}</td>
+                    <td class="py-3 px-4 text-center font-semibold text-emerald-600">${r.passed}</td>
+                    <td class="py-3 px-4 text-center font-semibold text-rose-600">${r.remedial}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${r.pct >= 75 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${r.pct}%</span>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Grafik 1: Perbandingan Antar Kelas
+            const ctx1 = document.getElementById('chart-classes').getContext('2d');
+            if (classChartInstance) classChartInstance.destroy();
+            classChartInstance = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: classSummaries.map(r => `Kelas ${r.cls}`),
+                    datasets: [{
+                        label: 'Rata-Rata Nilai Akhir',
+                        data: classSummaries.map(r => Number(r.avgFinal.toFixed(1))),
+                        backgroundColor: '#2563eb',
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, max: 100 } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            // Grafik 2: Distribusi Predikat Kelas Aktif
+            const activeSts = appState.students.filter(s => s.className === appState.activeClass).map(computeStudentGrades);
+            const counts = { A: 0, B: 0, C: 0, D: 0 };
+            activeSts.forEach(c => { if (counts[c.predicate] !== undefined) counts[c.predicate]++; });
+
+            const ctx2 = document.getElementById('chart-predicates').getContext('2d');
+            if (predicateChartInstance) predicateChartInstance.destroy();
+            predicateChartInstance = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Predikat A (90-100)', 'Predikat B (80-89)', 'Predikat C (KKTP-79)', 'Predikat D (< KKTP)'],
+                    datasets: [{
+                        data: [counts.A, counts.B, counts.C, counts.D],
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#f43f5e'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+                }
+            });
+        }
+
+        // =====================================================================
+        // MODAL TAMBAH / EDIT / HAPUS / IMPORT MASSAL SISWA
+        // =====================================================================
+        window.openStudentModal = function() {
+            document.getElementById('student-modal-title').textContent = 'Tambah Siswa Baru';
+            document.getElementById('edit-student-id').value = '';
+            document.getElementById('student-class').value = appState.activeClass;
+            document.getElementById('student-nis').value = '';
+            document.getElementById('student-name').value = '';
+            document.querySelector('input[name="student-gender"][value="L"]').checked = true;
+            document.getElementById('student-modal').classList.remove('hidden');
+        };
+
+        window.openEditStudentModal = function(studentId) {
+            const st = appState.students.find(s => s.id === studentId);
+            if (!st) return;
+            document.getElementById('student-modal-title').textContent = 'Edit Biodata Siswa';
+            document.getElementById('edit-student-id').value = st.id;
+            document.getElementById('student-class').value = st.className;
+            document.getElementById('student-nis').value = st.nis || '';
+            document.getElementById('student-name').value = st.name;
+            const radio = document.querySelector(`input[name="student-gender"][value="${st.gender}"]`);
+            if (radio) radio.checked = true;
+            document.getElementById('student-modal').classList.remove('hidden');
+        };
+
+        window.closeStudentModal = function() {
+            document.getElementById('student-modal').classList.add('hidden');
+        };
+
+        window.saveStudentForm = function(e) {
+            e.preventDefault();
+            const editId = document.getElementById('edit-student-id').value;
+            const className = document.getElementById('student-class').value;
+            const nis = document.getElementById('student-nis').value.trim();
+            const name = document.getElementById('student-name').value.trim();
+            const gender = document.querySelector('input[name="student-gender"]:checked').value;
+
+            if (!name) return;
+
+            let affectedId = editId;
+            if (editId) {
+                const idx = appState.students.findIndex(s => s.id === editId);
+                if (idx !== -1) {
+                    appState.students[idx] = {
+                        ...appState.students[idx],
+                        className,
+                        nis,
+                        name,
+                        gender,
+                        updatedAt: Date.now()
+                    };
+                    showToast('Data siswa berhasil diperbarui', 'success');
+                }
+            } else {
+                affectedId = `std_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+                appState.students.push({
+                    id: affectedId,
+                    className,
+                    nis,
+                    name,
+                    gender,
+                    nh: [null, null, null, null],
+                    uh: [null, null, null],
+                    pts: null,
+                    pas: null,
+                    updatedAt: Date.now()
+                });
+                appState.activeClass = className;
+                showToast(`Siswa "${name}" ditambahkan ke Kelas ${className}`, 'success');
+            }
+
+            closeStudentModal();
+            renderAll();
+            persistData(true, [affectedId], false);
+        };
+
+        window.confirmDeleteStudent = function(studentId) {
+            const st = appState.students.find(s => s.id === studentId);
+            if (!st) return;
+            document.getElementById('confirm-message').textContent = `Apakah Anda yakin ingin menghapus data nilai "${st.name}" (Kelas ${st.className})?`;
+            const yesBtn = document.getElementById('confirm-yes-btn');
+            yesBtn.onclick = () => {
+                appState.students = appState.students.filter(s => s.id !== studentId);
+                closeConfirmModal();
+                renderAll();
+                persistData(true, [studentId], false);
+                showToast(`Siswa "${st.name}" telah dihapus`, 'info');
+            };
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        };
+
+        window.closeConfirmModal = function() {
+            document.getElementById('confirm-modal').classList.add('hidden');
+        };
+
+        window.openBulkImportModal = function() {
+            document.getElementById('bulk-textarea').value = '';
+            document.getElementById('bulk-replace').checked = false;
+            document.getElementById('bulk-modal').classList.remove('hidden');
+        };
+
+        window.closeBulkImportModal = function() {
+            document.getElementById('bulk-modal').classList.add('hidden');
+        };
+
+        window.processBulkImport = function() {
+            const text = document.getElementById('bulk-textarea').value.trim();
+            if (!text) {
+                showToast('Masukkan minimal satu nama siswa terlebih dahulu', 'error');
+                return;
+            }
+            const replaceAll = document.getElementById('bulk-replace').checked;
+            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            const cls = appState.activeClass;
+            const imported = [];
+
+            lines.forEach((line, i) => {
+                // Mendukung pemisah koma, titik koma, atau tab (hasil copy langsung dari Excel)
+                const parts = line.split(/[,;\t]+/).map(p => p.trim());
+                let nis = '';
+                let name = '';
+                let gender = 'L';
+
+                if (parts.length >= 3) {
+                    nis = parts[0];
+                    name = parts[1];
+                    gender = parts[2].toUpperCase().startsWith('P') ? 'P' : 'L';
+                } else if (parts.length === 2) {
+                    if (/^\d+$/.test(parts[0])) {
+                        nis = parts[0];
+                        name = parts[1];
+                    } else {
+                        name = parts[0];
+                        gender = parts[1].toUpperCase().startsWith('P') ? 'P' : 'L';
+                    }
+                } else {
+                    name = parts[0];
+                    nis = `2627${cls.replace('.', '')}${String(i + 1).padStart(2, '0')}`;
+                }
+
+                if (name) {
+                    imported.push({
+                        id: `std_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 5)}`,
+                        className: cls,
+                        nis,
+                        name,
+                        gender,
+                        nh: [null, null, null, null],
+                        uh: [null, null, null],
+                        pts: null,
+                        pas: null,
+                        updatedAt: Date.now()
+                    });
+                }
+            });
+
+            const removedIds = replaceAll
+                ? appState.students.filter(s => s.className === cls).map(s => s.id)
+                : [];
+
+            if (replaceAll) {
+                appState.students = appState.students.filter(s => s.className !== cls).concat(imported);
+            } else {
+                appState.students = appState.students.concat(imported);
+            }
+
+            closeBulkImportModal();
+            renderAll();
+            persistData(true, [...removedIds, ...imported.map(s => s.id)], false);
+            showToast(`Berhasil mengimpor ${imported.length} siswa ke Kelas ${cls}`, 'success');
+        };
+
+        // =====================================================================
+        // MODAL PENGATURAN IDENTITAS GURU & BOBOT
+        // =====================================================================
+        window.openSettingsModal = function() {
+            const s = appState.settings;
+            document.getElementById('set-school').value = s.schoolName;
+            document.getElementById('set-subject').value = s.subject;
+            document.getElementById('set-semester').value = s.semester;
+            document.getElementById('set-year').value = s.academicYear;
+            document.getElementById('set-teacher').value = s.teacherName;
+            document.getElementById('set-teacher-nip').value = s.teacherNip;
+            document.getElementById('set-principal').value = s.principalName;
+            document.getElementById('set-principal-nip').value = s.principalNip;
+            document.getElementById('set-city-date').value = s.cityDate;
+            document.getElementById('set-kktp').value = s.kktp;
+            document.getElementById('set-w-nh').value = s.weights.nh;
+            document.getElementById('set-w-uh').value = s.weights.uh;
+            document.getElementById('set-w-pts').value = s.weights.pts;
+            document.getElementById('set-w-pas').value = s.weights.pas;
+            updateWeightTotalLabel();
+            document.getElementById('settings-modal').classList.remove('hidden');
+        };
+
+        window.closeSettingsModal = function() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        };
+
+        window.updateWeightTotalLabel = function() {
+            const total =
+                (Number(document.getElementById('set-w-nh').value) || 0) +
+                (Number(document.getElementById('set-w-uh').value) || 0) +
+                (Number(document.getElementById('set-w-pts').value) || 0) +
+                (Number(document.getElementById('set-w-pas').value) || 0);
+            const el = document.getElementById('weight-total-indicator');
+            el.textContent = `Total: ${total}%`;
+            el.className = total === 100 ? 'font-bold text-emerald-600' : 'font-bold text-rose-600';
+        };
+
+        window.saveSettingsForm = function(e) {
+            e.preventDefault();
+            const wNh = Number(document.getElementById('set-w-nh').value) || 0;
+            const wUh = Number(document.getElementById('set-w-uh').value) || 0;
+            const wPts = Number(document.getElementById('set-w-pts').value) || 0;
+            const wPas = Number(document.getElementById('set-w-pas').value) || 0;
+
+            if (wNh + wUh + wPts + wPas !== 100) {
+                showToast('Total bobot NH + UH + PTS + PAS harus tepat 100%', 'error');
+                return;
+            }
+
+            appState.settings = {
+                schoolName: document.getElementById('set-school').value.trim(),
+                subject: document.getElementById('set-subject').value.trim(),
+                semester: document.getElementById('set-semester').value,
+                academicYear: document.getElementById('set-year').value.trim(),
+                teacherName: document.getElementById('set-teacher').value.trim(),
+                teacherNip: document.getElementById('set-teacher-nip').value.trim(),
+                principalName: document.getElementById('set-principal').value.trim(),
+                principalNip: document.getElementById('set-principal-nip').value.trim(),
+                cityDate: document.getElementById('set-city-date').value.trim(),
+                kktp: Number(document.getElementById('set-kktp').value) || 75,
+                weights: { nh: wNh, uh: wUh, pts: wPts, pas: wPas }
+            };
+
+            closeSettingsModal();
+            renderAll();
+            persistData(true, [], true);
+            showToast('Pengaturan identitas & pembobotan nilai disimpan', 'success');
+        };
+
+        // =====================================================================
+        // EXPORT SPREADSHEET EXCEL (.XLSX) SESUAI STANDAR GURU
+        // =====================================================================
+        window.toggleExportMenu = function() {
+            document.getElementById('export-menu').classList.toggle('hidden');
+        };
+
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('export-menu');
+            if (menu && !e.target.closest('#export-menu') && !e.target.closest('button[onclick="toggleExportMenu()"]')) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        function buildClassWorksheet(cls) {
+            const s = appState.settings;
+            const students = appState.students.filter(st => st.className === cls);
+
+            const rows = [
+                [`DAFTAR NILAI HASIL BELAJAR SISWA - ${s.schoolName.toUpperCase()}`],
+                [`Mata Pelajaran : ${s.subject}`, '', '', '', '', '', '', `Kelas : ${cls}`],
+                [`Semester / TP  : ${s.semester} / ${s.academicYear}`, '', '', '', '', '', '', `KKTP  : ${s.kktp}`],
+                [`Pembobotan     : NH (${s.weights.nh}%) + UH (${s.weights.uh}%) + PTS (${s.weights.pts}%) + PAS (${s.weights.pas}%)`],
+                [],
+                [
+                    'No', 'NIS', 'Nama Lengkap Siswa', 'L/P',
+                    'NH 1', 'NH 2', 'NH 3', 'NH 4', 'Rata-Rata NH',
+                    'UH 1', 'UH 2', 'UH 3', 'Rata-Rata UH',
+                    'PTS', 'PAS', 'Nilai Akhir Rapor', 'Predikat', 'Keterangan'
+                ]
+            ];
+
+            students.forEach((st, idx) => {
+                const g = computeStudentGrades(st);
+                rows.push([
+                    idx + 1,
+                    st.nis || '-',
+                    st.name,
+                    st.gender,
+                    st.nh[0] ?? '',
+                    st.nh[1] ?? '',
+                    st.nh[2] ?? '',
+                    st.nh[3] ?? '',
+                    g.avgNH !== null ? Number(g.avgNH.toFixed(1)) : '',
+                    st.uh[0] ?? '',
+                    st.uh[1] ?? '',
+                    st.uh[2] ?? '',
+                    g.avgUH !== null ? Number(g.avgUH.toFixed(1)) : '',
+                    st.pts ?? '',
+                    st.pas ?? '',
+                    g.finalScore !== null ? Number(g.finalScore.toFixed(1)) : '',
+                    g.predicate,
+                    g.status
+                ]);
+            });
+
+            // Rekap bawah & Blok Tanda Tangan Resmi Guru & Kepala Sekolah
+            const computedList = students.map(computeStudentGrades);
+            const passedCount = computedList.filter(c => c.status === 'Tuntas').length;
+            const remCount = computedList.filter(c => c.status === 'Remedial').length;
+
+            rows.push([]);
+            rows.push(['', '', 'Jumlah Siswa Tuntas (≥ KKTP)', passedCount, '', '', '', 'Jumlah Siswa Remedial', remCount]);
+            rows.push([]);
+            rows.push(['', '', 'Mengetahui,', '', '', '', '', '', '', '', '', '', s.cityDate]);
+            rows.push(['', '', 'Kepala Sekolah,', '', '', '', '', '', '', '', '', '', 'Guru Mata Pelajaran,']);
+            rows.push([]);
+            rows.push([]);
+            rows.push([]);
+            rows.push(['', '', s.principalName, '', '', '', '', '', '', '', '', '', s.teacherName]);
+            rows.push(['', '', `NIP. ${s.principalNip || '-'}`, '', '', '', '', '', '', '', '', '', `NIP. ${s.teacherNip || '-'}`]);
+
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            ws['!cols'] = [
+                { wch: 5 },  // No
+                { wch: 14 }, // NIS
+                { wch: 28 }, // Nama
+                { wch: 5 },  // L/P
+                { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 12 }, // NH
+                { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 12 }, // UH
+                { wch: 8 }, { wch: 8 }, { wch: 16 }, { wch: 10 }, { wch: 14 } // Semester & Akhir
+            ];
+            return ws;
+        }
+
+        window.exportCurrentClassExcel = function() {
+            document.getElementById('export-menu').classList.add('hidden');
+            if (typeof XLSX === 'undefined') {
+                showToast('Library Excel sedang dimuat, coba sesaat lagi', 'error');
+                return;
+            }
+            const cls = appState.activeClass;
+            const wb = XLSX.utils.book_new();
+            const ws = buildClassWorksheet(cls);
+            XLSX.utils.book_append_sheet(wb, ws, `Kelas ${cls}`);
+            const safeSubject = appState.settings.subject.replace(/[^a-zA-Z0-9]/g, '_');
+            XLSX.writeFile(wb, `Daftar_Nilai_${safeSubject}_Kelas_${cls}.xlsx`);
+            showToast(`Spreadsheet Kelas ${cls} berhasil diunduh`, 'success');
+        };
+
+        window.exportAllClassesExcel = function() {
+            document.getElementById('export-menu').classList.add('hidden');
+            if (typeof XLSX === 'undefined') {
+                showToast('Library Excel sedang dimuat, coba sesaat lagi', 'error');
+                return;
+            }
+            const wb = XLSX.utils.book_new();
+
+            // Sheet 1: Rekapitulasi Antar Kelas
+            const s = appState.settings;
+            const recapRows = [
+                [`REKAPITULASI NILAI & KETUNTASAN SISWA - ${s.schoolName.toUpperCase()}`],
+                [`Mata Pelajaran: ${s.subject} | Semester: ${s.semester} | TP: ${s.academicYear} | KKTP: ${s.kktp}`],
+                [],
+                ['Kelas', 'Jumlah Siswa', 'Rata-Rata NH', 'Rata-Rata UH', 'Rata-Rata PTS', 'Rata-Rata PAS', 'Rata-Rata Nilai Akhir', 'Tuntas', 'Remedial', '% Ketuntasan']
+            ];
+
+            CLASSES.forEach(cls => {
+                const sts = appState.students.filter(st => st.className === cls);
+                const comps = sts.map(computeStudentGrades);
+                const avgOf = (fn) => {
+                    const vals = comps.map(fn).filter(v => v !== null);
+                    return vals.length ? Number((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)) : 0;
+                };
+                const passed = comps.filter(c => c.status === 'Tuntas').length;
+                const rem = comps.filter(c => c.status === 'Remedial').length;
+                const pct = sts.length ? `${Math.round((passed / sts.length) * 100)}%` : '0%';
+                recapRows.push([
+                    `Kelas ${cls}`, sts.length, avgOf(c => c.avgNH), avgOf(c => c.avgUH),
+                    avgOf(c => c.pts), avgOf(c => c.pas), avgOf(c => c.finalScore), passed, rem, pct
+                ]);
+            });
+
+            const recapWs = XLSX.utils.aoa_to_sheet(recapRows);
+            recapWs['!cols'] = [{ wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 14 }];
+            XLSX.utils.book_append_sheet(wb, recapWs, 'Rekap Semua Kelas');
+
+            // Sheet per kelas 7.1, 7.3, 7.4, 7.5, 7.6, 7.7
+            CLASSES.forEach(cls => {
+                const ws = buildClassWorksheet(cls);
+                XLSX.utils.book_append_sheet(wb, ws, `Kelas ${cls}`);
+            });
+
+            const safeSubject = s.subject.replace(/[^a-zA-Z0-9]/g, '_');
+            XLSX.writeFile(wb, `Buku_Nilai_Lengkap_${safeSubject}_Kelas_7.1-7.7.xlsx`);
+            showToast('Spreadsheet lengkap semua kelas (7.1 – 7.7) berhasil diunduh', 'success');
+        };
+
+        // =====================================================================
+        // UTILITAS UI & EVENT LIFECYCLE HALAMAN
+        // =====================================================================
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = type === 'success'
+                ? 'bg-emerald-900 text-white border-emerald-700'
+                : type === 'error'
+                    ? 'bg-rose-900 text-white border-rose-700'
+                    : 'bg-slate-900 text-white border-slate-700';
+
+            const icon = type === 'success'
+                ? 'fa-circle-check text-emerald-400'
+                : type === 'error'
+                    ? 'fa-circle-exclamation text-rose-400'
+                    : 'fa-circle-info text-blue-400';
+
+            toast.className = `pointer-events-auto px-4 py-3 rounded-2xl shadow-xl border text-xs sm:text-sm font-medium flex items-center gap-2.5 transition-all transform translate-y-2 opacity-0 ${colors}`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${escapeHtml(message)}</span>`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3200);
+        }
+
+        // Pastikan perubahan terakhir langsung tersimpan saat tab disembunyikan, halaman ditutup, atau koneksi kembali online
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden' && (hasUnsavedChanges || pendingStudentSyncIds.size > 0 || pendingMetaSync)) {
+                saveLocalWorkspaceData(appState.workspaceCode);
+                flushToCloud(appState.workspaceCode);
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            if (hasUnsavedChanges || pendingStudentSyncIds.size > 0 || pendingMetaSync) {
+                saveLocalWorkspaceData(appState.workspaceCode);
+                flushToCloud(appState.workspaceCode);
+            }
+        });
+
+        window.addEventListener('online', () => {
+            if (hasPendingQueueFlag(appState.workspaceCode) || hasUnsavedChanges) {
+                flushToCloud(appState.workspaceCode);
+            }
+        });
+
+        // Inisialisasi aplikasi saat halaman dimuat
+        loadLocalWorkspaceData(savedWorkspaceCode);
+        renderAll();
+        initCloudSync();
+    </script>
+</body>
+</html>
